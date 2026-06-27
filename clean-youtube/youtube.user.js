@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Clean YouTube Reysu (Text Only)
 // @namespace    reysu
-// @version      2.1
-// @description  Прячет ВСЕ превью YouTube (главная, трансляции, игры, новости, спорт, обучение, поиск, разделы — везде), оставляет только текст и аватарки. Единый вид карточек с центрированным контентом, горизонтальные полки развёрнуты в список, аккуратные разделители под цвет темы, убран раздел «Ещё темы».
+// @version      2.2
+// @description  Текстовый YouTube: убирает ВСЕ превью, лишние разделы (Музыка/Трансляции/Видеоигры/Новости/Спорт/Обучение/Мода/Студия/Music/Детям/Create) и «Ещё темы». Единый крупный вид карточек (главная == подписки), контент строго по центру, ровно один разделитель под цвет темы.
 // @match        *://m.youtube.com/*
 // @match        *://*.youtube.com/*
 // @run-at       document-start
@@ -85,7 +85,7 @@
             display: inline-block !important;
             visibility: visible !important;
         }
-        /* Размер 36px — ТОЛЬКО для аватарок внутри карточек ленты. */
+        /* Размер 40px — ТОЛЬКО для аватарок внутри карточек ленты. */
         ytm-rich-item-renderer ytm-profile-icon img,
         ytm-rich-item-renderer .ytProfileIconHost img,
         ytm-rich-item-renderer yt-avatar-shape img,
@@ -97,19 +97,18 @@
         ytm-video-with-context-renderer ytm-profile-icon img,
         ytm-compact-video-renderer ytm-profile-icon img,
         ytm-media-item ytm-profile-icon img {
-            width: 36px !important;
-            height: 36px !important;
-            max-width: 36px !important;
-            max-height: 36px !important;
+            width: 40px !important;
+            height: 40px !important;
+            max-width: 40px !important;
+            max-height: 40px !important;
             aspect-ratio: 1 / 1 !important;
             border-radius: 50% !important;
             object-fit: cover !important;
         }
 
-        /* ===== ЕДИНЫЙ ВИД КАРТОЧЕК + РАЗДЕЛИТЕЛИ =====
-           Все карточки одинаковой высоты, контент вертикально по центру,
-           тонкая серая линия под цвет темы между ними (токен темы YouTube,
-           серый fallback — если токена нет). */
+        /* ===== ЕДИНЫЙ ВИД КАРТОЧЕК =====
+           Все карточки одной высоты, контент строго по центру по вертикали,
+           одинаковый крупный вид (как на главной) — и в подписках тоже. */
         ytm-video-with-context-renderer,
         ytm-compact-video-renderer,
         ytm-video-card-renderer,
@@ -124,9 +123,9 @@
             gap: 12px !important;
             width: 100% !important;
             box-sizing: border-box !important;
-            padding: 12px 8px !important;
+            padding: 10px 8px !important;
             margin: 0 !important;
-            border-bottom: 1px solid var(--yt-spec-10-percent-layer, rgba(128, 128, 128, 0.28)) !important;
+            min-height: 64px !important;       /* единая высота карточек */
         }
         /* Видимый контент карточки занимает всю ширину, меню остаётся справа */
         ytm-video-with-context-renderer > *:not([style*="display: none"]),
@@ -135,23 +134,68 @@
             flex: 1 1 auto !important;
             min-width: 0 !important;
         }
-        /* Главная сетка: один аккуратный отступ, без двойных линий */
+        /* Убираем остаточное место от превью/встроенного плеера, чтобы
+           карточка по высоте = только содержимое (текст ровно по центру). */
+        ytm-rich-item-renderer ytm-inline-player-renderer,
+        ytm-video-with-context-renderer ytm-inline-player-renderer,
+        yt-lockup-view-model ytm-inline-player-renderer {
+            display: none !important;
+            height: 0 !important;
+        }
         ytm-rich-item-renderer {
+            height: auto !important;
+            min-height: 0 !important;
+            aspect-ratio: auto !important;
             margin: 0 !important;
             padding: 0 !important;
+        }
+
+        /* ===== РОВНО ОДИН РАЗДЕЛИТЕЛЬ МЕЖДУ ВИДЕО =====
+           Линию вешаем на внешний контейнер карточки. Полки/секции линий НЕ
+           получают — иначе появлялись «двойные» палки. */
+        ytm-rich-item-renderer,
+        ytm-video-with-context-renderer,
+        ytm-compact-video-renderer,
+        ytm-video-card-renderer,
+        ytm-channel-video-card-renderer,
+        ytm-media-item,
+        ytm-large-media-item-renderer,
+        ytm-playlist-video-renderer,
+        yt-lockup-view-model {
+            border-bottom: 1px solid var(--yt-spec-10-percent-layer, rgba(128, 128, 128, 0.28)) !important;
+        }
+        /* Если карточка вложена в rich-item — линия только у rich-item (без дублей) */
+        ytm-rich-item-renderer ytm-video-with-context-renderer,
+        ytm-rich-item-renderer ytm-compact-video-renderer,
+        ytm-rich-item-renderer ytm-video-card-renderer,
+        ytm-rich-item-renderer ytm-media-item,
+        ytm-rich-item-renderer yt-lockup-view-model {
             border-bottom: none !important;
         }
-        /* Разделитель между крупными полками/разделами */
+        /* Полки и секции — без собственных линий */
         ytm-rich-section-renderer,
         ytm-shelf-renderer,
-        ytm-item-section-renderer {
-            border-bottom: 1px solid var(--yt-spec-10-percent-layer, rgba(128, 128, 128, 0.28)) !important;
-            padding-bottom: 8px !important;
-            margin-bottom: 8px !important;
-        }
-        ytm-item-section-renderer:last-child,
-        ytm-rich-section-renderer:last-child {
+        ytm-item-section-renderer,
+        ytm-section-list-renderer {
             border-bottom: none !important;
+        }
+
+        /* ===== КРУПНЫЕ НАЗВАНИЯ (главная == подписки) =====
+           На мобильном YouTube 1rem = 10px, поэтому 1.6rem = 16px — это и есть
+           «крупный» размер главной. Подтягиваем подписки/компактные к нему. */
+        ytm-video-with-context-renderer .media-item-headline .yt-core-attributed-string,
+        ytm-compact-video-renderer .media-item-headline .yt-core-attributed-string,
+        ytm-video-with-context-renderer .media-item-headline span,
+        ytm-compact-video-renderer .media-item-headline span,
+        yt-lockup-view-model .yt-lockup-metadata-view-model-wiz__title,
+        yt-lockup-view-model [class*="metadata" i] [class*="title" i] {
+            font-size: 1.6rem !important;
+            line-height: 1.35 !important;
+            font-weight: 500 !important;
+            white-space: normal !important;
+            -webkit-line-clamp: 2 !important;
+            display: -webkit-box !important;
+            -webkit-box-orient: vertical !important;
         }
 
         /* ===== ГОРИЗОНТАЛЬНЫЕ ПОЛКИ → ВЕРТИКАЛЬНЫЙ СПИСОК =====
@@ -210,6 +254,26 @@
         ytm-shorts-lockup-view-model-v2,
         ytm-pivot-bar-item-renderer:has(a[href*="/shorts"]),
         ytm-pivot-bar-item-renderer:has([aria-label*="Shorts" i]) {
+            display: none !important;
+        }
+
+        /* ===== УБРАННЫЕ РАЗДЕЛЫ (меню/боковая панель) =====
+           Музыка, Трансляции, Видеоигры, Новости, Спорт, Обучение, Мода,
+           Творческая студия, YouTube Music/Детям/Create — нигде не доступны.
+           Прячем по адресу назначения (надёжно, без привязки к языку). */
+        a[href^="/gaming"], a[href^="/news"], a[href^="/sports"],
+        a[href^="/learning"], a[href^="/fashion"],
+        a[href*="music.youtube.com"], a[href*="studio.youtube.com"],
+        a[href*="youtubekids.com"], a[href*="youtube.com/create"],
+        ytm-guide-entry-renderer:has(a[href^="/gaming"]),
+        ytm-guide-entry-renderer:has(a[href^="/news"]),
+        ytm-guide-entry-renderer:has(a[href^="/sports"]),
+        ytm-guide-entry-renderer:has(a[href^="/learning"]),
+        ytm-guide-entry-renderer:has(a[href^="/fashion"]),
+        ytm-guide-entry-renderer:has(a[href*="music.youtube.com"]),
+        ytm-guide-entry-renderer:has(a[href*="studio.youtube.com"]),
+        ytm-guide-entry-renderer:has(a[href*="youtubekids.com"]),
+        ytm-guide-entry-renderer:has(a[href*="youtube.com/create"]) {
             display: none !important;
         }
 
@@ -361,10 +425,10 @@
             if (!inCard || inChrome) return;
             img.style.setProperty('display', 'inline-block', 'important');
             img.style.setProperty('visibility', 'visible', 'important');
-            img.style.setProperty('width', '36px', 'important');
-            img.style.setProperty('height', '36px', 'important');
-            img.style.setProperty('max-width', '36px', 'important');
-            img.style.setProperty('max-height', '36px', 'important');
+            img.style.setProperty('width', '40px', 'important');
+            img.style.setProperty('height', '40px', 'important');
+            img.style.setProperty('max-width', '40px', 'important');
+            img.style.setProperty('max-height', '40px', 'important');
             img.style.setProperty('aspect-ratio', '1 / 1', 'important');
             img.style.setProperty('border-radius', '50%', 'important');
             img.style.setProperty('object-fit', 'cover', 'important');
@@ -431,19 +495,71 @@
         'ещё темы', 'еще темы', 'больше тем', 'ещё на youtube', 'еще на youtube',
         'more topics', 'explore more', 'more from youtube'
     ];
+    const SECTION_BOX = 'ytm-rich-section-renderer, ytm-shelf-renderer, ' +
+        'ytm-rich-shelf-renderer, grid-shelf-view-model, ytm-item-section-renderer';
     const hideMoreTopics = (root) => {
         if (!root.querySelectorAll) return;
+        // Перебираем короткие текстовые узлы-заголовки и сверяем точное совпадение.
         root.querySelectorAll(
-            'ytm-rich-section-renderer, ytm-shelf-renderer, ' +
-            'ytm-rich-shelf-renderer, grid-shelf-view-model'
-        ).forEach(sec => {
-            const head = sec.querySelector(
-                'h2, h3, [role="heading"], .shelf-header-layout, ' +
-                '[class*="title" i], [class*="header" i]'
-            );
-            const t = (head?.textContent || '').trim().toLowerCase();
-            if (t && MORE_TOPICS.some(l => t.includes(l))) {
-                sec.style.setProperty('display', 'none', 'important');
+            'h2, h3, [role="heading"], .shelf-title, yt-formatted-string, span'
+        ).forEach(head => {
+            const t = (head.textContent || '').trim().toLowerCase();
+            if (!t || t.length > 24) return;
+            if (MORE_TOPICS.some(l => t === l)) {
+                const sec = head.closest(SECTION_BOX);
+                (sec || head).style.setProperty('display', 'none', 'important');
+            }
+        });
+    };
+
+    // ===== УБРАННЫЕ РАЗДЕЛЫ: меню + чипы фильтров =====
+    // Точные подписи (как видит пользователь) + английские варианты.
+    const REMOVED_LABELS = new Set([
+        'музыка', 'music', 'youtube music',
+        'трансляции', 'прямые трансляции', 'live',
+        'видеоигры', 'игры', 'gaming', 'games',
+        'новости', 'news',
+        'спорт', 'sport', 'sports',
+        'обучение', 'courses', 'learning',
+        'мода и красота', 'мода', 'fashion & beauty', 'fashion and beauty', 'fashion',
+        'творческая студия youtube', 'творческая студия', 'youtube studio', 'studio',
+        'youtube детям', 'youtube kids', 'youtube create'
+    ]);
+    const REMOVED_HREFS = [
+        '/gaming', '/news', '/sports', '/learning', '/fashion',
+        'music.youtube.com', 'studio.youtube.com', 'youtubekids.com',
+        'youtube.com/create'
+    ];
+    const inFeedCard = (el) => !!el.closest(
+        'ytm-rich-item-renderer, ytm-video-with-context-renderer, ' +
+        'ytm-compact-video-renderer, yt-lockup-view-model, ytm-media-item'
+    );
+    const hideRemovedSections = (root) => {
+        if (!root.querySelectorAll) return;
+        // 1) Пункты бокового меню (ссылки) — по адресу или по точной подписи.
+        root.querySelectorAll('a[href]').forEach(a => {
+            const href = (a.getAttribute('href') || '').toLowerCase();
+            const text = (a.textContent || '').trim().toLowerCase();
+            const byHref = REMOVED_HREFS.some(h => href.includes(h));
+            // подпись сверяем только ВНЕ карточек видео (чтобы не трогать каналы)
+            const byText = REMOVED_LABELS.has(text) && !inFeedCard(a);
+            if (byHref || byText) {
+                const row = a.closest(
+                    'ytm-guide-entry-renderer, .guide-entry, ' +
+                    '[role="menuitem"], li'
+                ) || a;
+                row.style.setProperty('display', 'none', 'important');
+            }
+        });
+        // 2) Чипы-фильтры сверху (Музыка/Видеоигры/...) — кроме «Все».
+        root.querySelectorAll(
+            'ytm-chip-cloud-chip-renderer, .chip-container, ' +
+            'button[role="tab"], yt-chip-cloud-chip-view-model'
+        ).forEach(chip => {
+            const text = (chip.textContent || '').trim().toLowerCase();
+            if (text === 'все' || text === 'all') return;
+            if (REMOVED_LABELS.has(text)) {
+                chip.style.setProperty('display', 'none', 'important');
             }
         });
     };
@@ -478,6 +594,7 @@
         hideShorts(root);
         hideCommunity(root);
         hideMoreTopics(root);
+        hideRemovedSections(root);
         killInlinePlayback(root);
     };
 
