@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Clean YouTube Reysu (Text Only)
 // @namespace    reysu
-// @version      2.2
+// @version      2.3
 // @description  Текстовый YouTube: убирает ВСЕ превью, лишние разделы (Музыка/Трансляции/Видеоигры/Новости/Спорт/Обучение/Мода/Студия/Music/Детям/Create) и «Ещё темы». Единый крупный вид карточек (главная == подписки), контент строго по центру, ровно один разделитель под цвет темы.
 // @match        *://m.youtube.com/*
 // @match        *://*.youtube.com/*
@@ -106,9 +106,18 @@
             object-fit: cover !important;
         }
 
-        /* ===== ЕДИНЫЙ ВИД КАРТОЧЕК =====
-           Все карточки одной высоты, контент строго по центру по вертикали,
-           одинаковый крупный вид (как на главной) — и в подписках тоже. */
+        /* ===== ЕДИНЫЙ ВИД КАРТОЧЕК (как на главной — везде) =====
+           НЕ навязываем свой flex/row: родная вёрстка карточки после удаления
+           превью уже даёт идеальный «домашний» вид. Мы лишь убираем остаточное
+           место от превью/плеера и задаём ровный симметричный отступ, чтобы
+           разделитель плотно облегал контент и текст стоял по центру. */
+        ytm-rich-item-renderer {
+            height: auto !important;
+            min-height: 0 !important;
+            aspect-ratio: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
         ytm-video-with-context-renderer,
         ytm-compact-video-renderer,
         ytm-video-card-renderer,
@@ -117,37 +126,18 @@
         ytm-large-media-item-renderer,
         ytm-playlist-video-renderer,
         yt-lockup-view-model {
-            display: flex !important;
-            flex-direction: row !important;
-            align-items: center !important;   /* контент по центру по вертикали */
-            gap: 12px !important;
             width: 100% !important;
             box-sizing: border-box !important;
-            padding: 10px 8px !important;
             margin: 0 !important;
-            min-height: 64px !important;       /* единая высота карточек */
+            padding: 10px 8px !important;
+            min-height: 0 !important;
+            height: auto !important;
+            aspect-ratio: auto !important;
         }
-        /* Видимый контент карточки занимает всю ширину, меню остаётся справа */
-        ytm-video-with-context-renderer > *:not([style*="display: none"]),
-        ytm-compact-video-renderer > *:not([style*="display: none"]),
-        yt-lockup-view-model > *:not([style*="display: none"]) {
-            flex: 1 1 auto !important;
-            min-width: 0 !important;
-        }
-        /* Убираем остаточное место от превью/встроенного плеера, чтобы
-           карточка по высоте = только содержимое (текст ровно по центру). */
-        ytm-rich-item-renderer ytm-inline-player-renderer,
-        ytm-video-with-context-renderer ytm-inline-player-renderer,
-        yt-lockup-view-model ytm-inline-player-renderer {
+        /* Остаточное место от встроенного плеера */
+        ytm-inline-player-renderer {
             display: none !important;
             height: 0 !important;
-        }
-        ytm-rich-item-renderer {
-            height: auto !important;
-            min-height: 0 !important;
-            aspect-ratio: auto !important;
-            margin: 0 !important;
-            padding: 0 !important;
         }
 
         /* ===== РОВНО ОДИН РАЗДЕЛИТЕЛЬ МЕЖДУ ВИДЕО =====
@@ -180,22 +170,37 @@
             border-bottom: none !important;
         }
 
-        /* ===== КРУПНЫЕ НАЗВАНИЯ (главная == подписки) =====
-           На мобильном YouTube 1rem = 10px, поэтому 1.6rem = 16px — это и есть
-           «крупный» размер главной. Подтягиваем подписки/компактные к нему. */
+        /* ===== КРУПНЫЕ НАЗВАНИЯ + НИКАКОЙ ОБРЕЗКИ (главная == подписки == история) =====
+           На мобильном YouTube 1rem = 10px, поэтому 1.5rem = 15px ≈ размер
+           главной. Контейнер заголовка разжимаем по высоте, чтобы 2 строки не
+           срезались. */
+        ytm-video-with-context-renderer .media-item-headline,
+        ytm-compact-video-renderer .media-item-headline,
+        ytm-video-card-renderer .media-item-headline,
+        ytm-media-item .media-item-headline,
+        [class*="headline" i] {
+            max-height: none !important;
+            height: auto !important;
+            overflow: visible !important;
+            -webkit-line-clamp: 2 !important;
+        }
         ytm-video-with-context-renderer .media-item-headline .yt-core-attributed-string,
         ytm-compact-video-renderer .media-item-headline .yt-core-attributed-string,
+        ytm-video-card-renderer .media-item-headline .yt-core-attributed-string,
+        ytm-media-item .media-item-headline .yt-core-attributed-string,
         ytm-video-with-context-renderer .media-item-headline span,
         ytm-compact-video-renderer .media-item-headline span,
+        ytm-video-card-renderer .media-item-headline span,
         yt-lockup-view-model .yt-lockup-metadata-view-model-wiz__title,
         yt-lockup-view-model [class*="metadata" i] [class*="title" i] {
-            font-size: 1.6rem !important;
+            font-size: 1.5rem !important;
             line-height: 1.35 !important;
             font-weight: 500 !important;
             white-space: normal !important;
             -webkit-line-clamp: 2 !important;
             display: -webkit-box !important;
             -webkit-box-orient: vertical !important;
+            overflow: hidden !important;
         }
 
         /* ===== ГОРИЗОНТАЛЬНЫЕ ПОЛКИ → ВЕРТИКАЛЬНЫЙ СПИСОК =====
@@ -208,23 +213,35 @@
         ytm-carousel [class*="carousel-items"],
         yt-horizontal-list-renderer #items,
         grid-shelf-view-model .grid-shelf-view-model-wiz__grid,
+        grid-shelf-view-model [class*="grid" i],
+        [class*="horizontal-list" i],
+        [class*="card-list" i],
         .yt-horizontal-list-renderer-wiz__items {
             display: flex !important;
             flex-direction: column !important;
             overflow: visible !important;
             width: 100% !important;
             transform: none !important;
+            scroll-snap-type: none !important;
         }
-        /* Каждый элемент такой полки — на всю ширину, без обрезки текста */
+        /* Каждый элемент такой полки — на всю ширину, БЛОКОМ (внутренняя
+           вёрстка карточки остаётся вертикальной: заголовок → канал/просмотры,
+           без наложения текста друг на друга). */
+        ytm-horizontal-card-list-renderer > *,
         ytm-horizontal-card-list-renderer ytm-video-card-renderer,
         ytm-horizontal-card-list-renderer ytm-video-with-context-renderer,
-        ytm-horizontal-card-list-renderer > *,
+        ytm-horizontal-card-list-renderer ytm-compact-video-renderer,
         ytm-carousel ytm-video-card-renderer,
+        grid-shelf-view-model > *,
         grid-shelf-view-model yt-lockup-view-model,
-        grid-shelf-view-model > * {
+        [class*="card-list" i] > *,
+        [class*="horizontal-list" i] > * {
+            display: block !important;
             width: 100% !important;
             max-width: 100% !important;
+            min-width: 0 !important;
             margin: 0 !important;
+            flex: none !important;
         }
         /* Заголовки видео в таких карточках — переносим, а не режем */
         ytm-video-card-renderer .yt-core-attributed-string,
@@ -232,6 +249,8 @@
             white-space: normal !important;
             -webkit-line-clamp: 2 !important;
             display: -webkit-box !important;
+            -webkit-box-orient: vertical !important;
+            overflow: hidden !important;
         }
 
         /* ===== РЕКЛАМА ===== */
