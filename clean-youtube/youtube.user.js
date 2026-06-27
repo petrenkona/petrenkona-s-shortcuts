@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Clean YouTube Reysu (Text Only)
 // @namespace    reysu
-// @version      2.3
+// @version      2.4
 // @description  Текстовый YouTube: убирает ВСЕ превью, лишние разделы (Музыка/Трансляции/Видеоигры/Новости/Спорт/Обучение/Мода/Студия/Music/Детям/Create) и «Ещё темы». Единый крупный вид карточек (главная == подписки), контент строго по центру, ровно один разделитель под цвет темы.
 // @match        *://m.youtube.com/*
 // @match        *://*.youtube.com/*
@@ -263,16 +263,31 @@
             display: none !important;
         }
 
-        /* ===== SHORTS ===== */
+        /* ===== SHORTS — нигде, даже через историю ===== */
         ytm-reel-shelf-renderer,
         ytm-rich-section-renderer:has(ytm-reel-shelf-renderer),
         ytm-rich-item-renderer:has(a[href*="/shorts"]),
         ytm-video-with-context-renderer:has(a[href*="/shorts"]),
+        ytm-compact-video-renderer:has(a[href*="/shorts"]),
+        ytm-video-card-renderer:has(a[href*="/shorts"]),
+        ytm-media-item:has(a[href*="/shorts"]),
+        ytm-playlist-video-renderer:has(a[href*="/shorts"]),
         yt-lockup-view-model:has(a[href*="/shorts"]),
         grid-shelf-view-model:has([href*="/shorts"]),
+        ytm-shelf-renderer:has(a[href*="/shorts"]),
         ytm-shorts-lockup-view-model-v2,
         ytm-pivot-bar-item-renderer:has(a[href*="/shorts"]),
         ytm-pivot-bar-item-renderer:has([aria-label*="Shorts" i]) {
+            display: none !important;
+        }
+
+        /* ===== ЛОАДЕР/СПИННЕР («крутится фигня» в профиле и не только) ===== */
+        tp-yt-paper-spinner,
+        tp-yt-paper-spinner-lite,
+        ml-spinner,
+        .ytSpinner,
+        .ytSpinnerHost,
+        [class*="spinner" i] {
             display: none !important;
         }
 
@@ -434,7 +449,8 @@
             const inCard = img.closest(
                 'ytm-rich-item-renderer, yt-lockup-view-model, ' +
                 'ytm-video-with-context-renderer, ytm-compact-video-renderer, ' +
-                'ytm-media-item'
+                'ytm-media-item, ytm-video-card-renderer, ' +
+                'ytm-channel-video-card-renderer, ytm-playlist-video-renderer'
             );
             const inChrome = img.closest(
                 'ytm-pivot-bar, ytm-pivot-bar-renderer, ' +
@@ -479,9 +495,11 @@
         root.querySelectorAll('a[href*="/shorts"]').forEach(a => {
             const item = a.closest(
                 'ytm-pivot-bar-item-renderer, ytm-rich-item-renderer, ' +
-                'yt-lockup-view-model, ytm-video-with-context-renderer, ytm-reel-item-renderer'
+                'yt-lockup-view-model, ytm-video-with-context-renderer, ' +
+                'ytm-compact-video-renderer, ytm-video-card-renderer, ' +
+                'ytm-media-item, ytm-playlist-video-renderer, ytm-reel-item-renderer'
             );
-            if (item) item.style.display = 'none';
+            if (item) item.style.setProperty('display', 'none', 'important');
         });
         root.querySelectorAll('ytm-pivot-bar-item-renderer').forEach(item => {
             const host = item.querySelector('[aria-label], [title], button, a');
@@ -583,6 +601,77 @@
         });
     };
 
+    // ===== АВАТАРКИ В ИСТОРИИ (как на главной) =====
+    // Компактные карточки истории не содержат аватарку в разметке. Поэтому
+    // собираем пары «канал → аватарка» с карточек, где аватарка ЕСТЬ (главная,
+    // подписки), и подставляем нужную слева в карточки истории.
+    const avatarCache = new Map(); // имя канала (lc) -> src аватарки
+
+    const cardChannelName = (card) => {
+        // имя канала = текст ссылки на канал (а не на /watch)
+        for (const a of card.querySelectorAll('a[href]')) {
+            const h = a.getAttribute('href') || '';
+            if (h.startsWith('/@') || h.includes('/channel/') ||
+                h.includes('/user/') || h.startsWith('/c/')) {
+                const t = (a.textContent || '').trim();
+                if (t) return t.toLowerCase();
+            }
+        }
+        const by = card.querySelector(
+            '.media-item-byline, [class*="byline" i], [class*="metadata" i]'
+        );
+        let t = (by?.textContent || '').trim();
+        t = t.split('•')[0].split('·')[0].trim();
+        return t.toLowerCase();
+    };
+
+    const harvestAvatars = (root) => {
+        if (!root.querySelectorAll) return;
+        root.querySelectorAll(
+            'ytm-rich-item-renderer, ytm-video-with-context-renderer, ' +
+            'ytm-compact-video-renderer, yt-lockup-view-model'
+        ).forEach(card => {
+            let img = null;
+            for (const im of card.querySelectorAll('img')) {
+                if (isAvatar(im)) { img = im; break; }
+            }
+            if (!img) return;
+            const src = img.src || img.getAttribute('src') || '';
+            if (!src) return;
+            const name = cardChannelName(card);
+            if (name) avatarCache.set(name, src);
+        });
+    };
+
+    const injectHistoryAvatars = (root) => {
+        if (!root.querySelectorAll) return;
+        root.querySelectorAll(
+            'ytm-video-card-renderer, ytm-playlist-video-renderer'
+        ).forEach(card => {
+            try {
+                if (card.dataset.reysuAvatar) return;
+                // уже есть своя аватарка — ничего не делаем
+                for (const im of card.querySelectorAll('img'))
+                    if (isAvatar(im)) { card.dataset.reysuAvatar = 'native'; return; }
+                const name = cardChannelName(card);
+                if (!name) return;
+                const src = avatarCache.get(name);
+                if (!src) return;
+                const img = document.createElement('img');
+                img.src = src;
+                img.alt = '';
+                img.referrerPolicy = 'no-referrer';
+                img.style.cssText =
+                    'position:absolute;left:8px;top:50%;transform:translateY(-50%);' +
+                    'width:40px;height:40px;border-radius:50%;object-fit:cover;z-index:1;';
+                card.style.setProperty('position', 'relative', 'important');
+                card.style.setProperty('padding-left', '60px', 'important');
+                card.appendChild(img);
+                card.dataset.reysuAvatar = '1';
+            } catch (e) {}
+        });
+    };
+
     const killInlinePlayback = (root) => {
         if (!root.querySelectorAll) return;
         const onWatch = location.pathname.startsWith('/watch');
@@ -614,6 +703,8 @@
         hideCommunity(root);
         hideMoreTopics(root);
         hideRemovedSections(root);
+        harvestAvatars(root);
+        injectHistoryAvatars(root);
         killInlinePlayback(root);
     };
 
