@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Clean YouTube Reysu (Text Only)
 // @namespace    reysu
-// @version      2.0
-// @description  Прячет ВСЕ превью YouTube (главная, трансляции, игры, новости, спорт, обучение, поиск, разделы — везде), оставляет только текст и аватарки, добавляет аккуратные разделители под цвет темы.
+// @version      2.1
+// @description  Прячет ВСЕ превью YouTube (главная, трансляции, игры, новости, спорт, обучение, поиск, разделы — везде), оставляет только текст и аватарки. Единый вид карточек с центрированным контентом, горизонтальные полки развёрнуты в список, аккуратные разделители под цвет темы, убран раздел «Ещё темы».
 // @match        *://m.youtube.com/*
 // @match        *://*.youtube.com/*
 // @run-at       document-start
@@ -49,8 +49,12 @@
             display: none !important;
             width: 0 !important;
             height: 0 !important;
+            min-width: 0 !important;
             min-height: 0 !important;
             max-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: 0 !important;
             aspect-ratio: auto !important;
         }
 
@@ -102,10 +106,10 @@
             object-fit: cover !important;
         }
 
-        /* ===== РАЗДЕЛИТЕЛИ под цвет темы =====
-           Тонкая серая линия между карточками, чтобы текст не "сливался".
-           Цвет берём из токена темы YouTube (адаптируется к тёмной/светлой),
-           серый запасной вариант — если токена нет. */
+        /* ===== ЕДИНЫЙ ВИД КАРТОЧЕК + РАЗДЕЛИТЕЛИ =====
+           Все карточки одинаковой высоты, контент вертикально по центру,
+           тонкая серая линия под цвет темы между ними (токен темы YouTube,
+           серый fallback — если токена нет). */
         ytm-video-with-context-renderer,
         ytm-compact-video-renderer,
         ytm-video-card-renderer,
@@ -114,16 +118,30 @@
         ytm-large-media-item-renderer,
         ytm-playlist-video-renderer,
         yt-lockup-view-model {
-            display: block !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;   /* контент по центру по вертикали */
+            gap: 12px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            padding: 12px 8px !important;
+            margin: 0 !important;
             border-bottom: 1px solid var(--yt-spec-10-percent-layer, rgba(128, 128, 128, 0.28)) !important;
-            padding-bottom: 12px !important;
-            margin-bottom: 12px !important;
         }
-        /* Чуть больше воздуха у карточек главной сетки */
+        /* Видимый контент карточки занимает всю ширину, меню остаётся справа */
+        ytm-video-with-context-renderer > *:not([style*="display: none"]),
+        ytm-compact-video-renderer > *:not([style*="display: none"]),
+        yt-lockup-view-model > *:not([style*="display: none"]) {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+        }
+        /* Главная сетка: один аккуратный отступ, без двойных линий */
         ytm-rich-item-renderer {
-            margin-bottom: 4px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border-bottom: none !important;
         }
-        /* Разделитель между горизонтальными полками/разделами */
+        /* Разделитель между крупными полками/разделами */
         ytm-rich-section-renderer,
         ytm-shelf-renderer,
         ytm-item-section-renderer {
@@ -131,10 +149,45 @@
             padding-bottom: 8px !important;
             margin-bottom: 8px !important;
         }
-        /* Последний элемент списка — без линии снизу */
         ytm-item-section-renderer:last-child,
         ytm-rich-section-renderer:last-child {
             border-bottom: none !important;
+        }
+
+        /* ===== ГОРИЗОНТАЛЬНЫЕ ПОЛКИ → ВЕРТИКАЛЬНЫЙ СПИСОК =====
+           История, "Лучшие игровые трансляции", карусели в разделах и т.п.
+           раньше были узкими столбиками под ширину превью — текст обрезался.
+           Разворачиваем их в нормальный список на всю ширину. */
+        ytm-horizontal-card-list-renderer .horizontal-card-list__card-list,
+        ytm-horizontal-card-list-renderer [class*="card-list"],
+        ytm-horizontal-list-renderer [class*="horizontal-list"],
+        ytm-carousel [class*="carousel-items"],
+        yt-horizontal-list-renderer #items,
+        grid-shelf-view-model .grid-shelf-view-model-wiz__grid,
+        .yt-horizontal-list-renderer-wiz__items {
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: visible !important;
+            width: 100% !important;
+            transform: none !important;
+        }
+        /* Каждый элемент такой полки — на всю ширину, без обрезки текста */
+        ytm-horizontal-card-list-renderer ytm-video-card-renderer,
+        ytm-horizontal-card-list-renderer ytm-video-with-context-renderer,
+        ytm-horizontal-card-list-renderer > *,
+        ytm-carousel ytm-video-card-renderer,
+        grid-shelf-view-model yt-lockup-view-model,
+        grid-shelf-view-model > * {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+        }
+        /* Заголовки видео в таких карточках — переносим, а не режем */
+        ytm-video-card-renderer .yt-core-attributed-string,
+        ytm-video-card-renderer [class*="title" i] {
+            white-space: normal !important;
+            -webkit-line-clamp: 2 !important;
+            display: -webkit-box !important;
         }
 
         /* ===== РЕКЛАМА ===== */
@@ -157,6 +210,15 @@
         ytm-shorts-lockup-view-model-v2,
         ytm-pivot-bar-item-renderer:has(a[href*="/shorts"]),
         ytm-pivot-bar-item-renderer:has([aria-label*="Shorts" i]) {
+            display: none !important;
+        }
+
+        /* ===== РАЗДЕЛ "ЕЩЁ ТЕМЫ" / "MORE TOPICS" =====
+           Это полка-секция с набором чипов внутри ленты. Верхнюю панель
+           фильтров (Все/Видеоигры/Музыка) НЕ трогаем — она вне rich-section. */
+        ytm-rich-section-renderer:has(ytm-feed-filter-chip-bar-renderer),
+        ytm-rich-section-renderer:has(ytm-chip-cloud-renderer),
+        ytm-rich-section-renderer:has(.chip-bar) {
             display: none !important;
         }
 
@@ -363,6 +425,29 @@
         });
     };
 
+    // Раздел "Ещё темы" / "More topics" — прячем по тексту заголовка
+    // (надёжнее, чем по классам: работает на любом языке интерфейса).
+    const MORE_TOPICS = [
+        'ещё темы', 'еще темы', 'больше тем', 'ещё на youtube', 'еще на youtube',
+        'more topics', 'explore more', 'more from youtube'
+    ];
+    const hideMoreTopics = (root) => {
+        if (!root.querySelectorAll) return;
+        root.querySelectorAll(
+            'ytm-rich-section-renderer, ytm-shelf-renderer, ' +
+            'ytm-rich-shelf-renderer, grid-shelf-view-model'
+        ).forEach(sec => {
+            const head = sec.querySelector(
+                'h2, h3, [role="heading"], .shelf-header-layout, ' +
+                '[class*="title" i], [class*="header" i]'
+            );
+            const t = (head?.textContent || '').trim().toLowerCase();
+            if (t && MORE_TOPICS.some(l => t.includes(l))) {
+                sec.style.setProperty('display', 'none', 'important');
+            }
+        });
+    };
+
     const killInlinePlayback = (root) => {
         if (!root.querySelectorAll) return;
         const onWatch = location.pathname.startsWith('/watch');
@@ -392,6 +477,7 @@
         hideAds(root);
         hideShorts(root);
         hideCommunity(root);
+        hideMoreTopics(root);
         killInlinePlayback(root);
     };
 
