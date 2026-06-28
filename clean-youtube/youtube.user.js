@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Clean YouTube Reysu (Text Only)
 // @namespace    reysu
-// @version      2.7
+// @version      2.8
 // @description  Текстовый YouTube: убирает ВСЕ превью, лишние разделы (Музыка/Трансляции/Видеоигры/Новости/Спорт/Обучение/Мода/Студия/Music/Детям/Create) и «Ещё темы». Единый крупный вид карточек (главная == подписки), контент строго по центру, ровно один разделитель под цвет темы.
 // @match        *://m.youtube.com/*
 // @match        *://*.youtube.com/*
@@ -221,6 +221,15 @@
             padding-left: 0 !important;
             text-align: left !important;
             flex: 1 1 auto !important;
+        }
+        /* Гарантированная высота карточек плейлистов — чтобы «Смотреть позже» и
+           «Понравившиеся» не наезжали друг на друга. */
+        ytm-compact-playlist-renderer,
+        ytm-playlist-renderer {
+            display: block !important;
+            min-height: 56px !important;
+            position: relative !important;
+            overflow: hidden !important;
         }
 
         /* ===== ГОРИЗОНТАЛЬНЫЕ ПОЛКИ → ВЕРТИКАЛЬНЫЙ СПИСОК =====
@@ -483,6 +492,27 @@
         });
     };
 
+    // ТОЛЬКО плейлисты: схлопываем ссылку-превью (ведёт на плейлист, картинка,
+    // без текста). Главную/ленту (/watch) НЕ трогаем — поэтому текст там не
+    // съезжает. Здесь же убираем пустую левую колонку у карточек плейлистов.
+    const collapsePlaylistThumbs = (root) => {
+        if (!root.querySelectorAll) return;
+        root.querySelectorAll('a[href*="list="], a[href*="/playlist"]').forEach(a => {
+            const hasMedia = a.querySelector(
+                'img, yt-image, ytm-thumbnail-cover, ' +
+                '[class*="thumbnail" i], [class*="image" i]'
+            );
+            if (!hasMedia) return;
+            let txt = '';
+            try { txt = (a.innerText || '').trim(); }
+            catch (e) { txt = (a.textContent || '').trim(); }
+            if (txt && !/^[\d:\s.,]+$/.test(txt)) return; // есть текст — это заголовок
+            a.style.setProperty('display', 'none', 'important');
+            a.style.setProperty('width', '0', 'important');
+            a.style.setProperty('height', '0', 'important');
+        });
+    };
+
     const showAvatars = (root) => {
         if (!root.querySelectorAll) return;
         root.querySelectorAll('img').forEach(img => {
@@ -742,6 +772,7 @@
 
     const sweep = (root = document) => {
         killThumbs(root);
+        collapsePlaylistThumbs(root);
         showAvatars(root);
         hideAds(root);
         hideShorts(root);
