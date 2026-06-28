@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Clean YouTube Reysu (Text Only)
 // @namespace    reysu
-// @version      3.2
+// @version      3.3
 // @description  Текстовый YouTube: убирает ВСЕ превью, лишние разделы (Музыка/Трансляции/Видеоигры/Новости/Спорт/Обучение/Мода/Студия/Music/Детям/Create) и «Ещё темы». Единый крупный вид карточек (главная == подписки), контент строго по центру, ровно один разделитель под цвет темы.
 // @match        *://m.youtube.com/*
 // @match        *://*.youtube.com/*
@@ -11,6 +11,24 @@
 
 (function () {
     'use strict';
+
+    // ===================== НАСТРОЙКИ =====================
+    // Поставь false, чтобы выключить конкретную функцию. Менять можно прямо
+    // здесь — перезагрузи YouTube после изменения.
+    const CONFIG = {
+        hideThumbnails:   true,   // убирать превью видео (везде)
+        showAvatars:      true,   // оставлять аватарки каналов в карточках
+        dividers:         true,   // серые разделители между видео
+        hideShorts:       true,   // убирать Shorts (везде, в т.ч. в истории)
+        hideAds:          true,   // убирать рекламу
+        hideCommunity:    true,   // убирать посты/опросы «Сообщества»
+        hideMoreTopics:   true,   // убирать раздел «Ещё темы»
+        removeSections:   true,   // убирать Музыка/Игры/Новости/Студия и т.п.
+        cleanPlaylists:   true,   // чистый вид плейлистов (без обложек/наложений)
+        historyAvatars:   true,   // подставлять аватарки в истории
+        stopAutoplay:     true,   // глушить автозапуск превью-видео
+    };
+    // ====================================================
 
     const css = `
         /* ===== ПРЕВЬЮ: убираем ВЕЗДЕ, оба движка =====
@@ -381,11 +399,34 @@
         }
     `;
 
+    // Удаляет блок CSS от его заголовка "/* ===== … =====" до следующего такого
+    // заголовка — так выключаем CSS-часть отключённой в CONFIG функции.
+    const buildCSS = () => {
+        let out = css;
+        const drop = (header) => {
+            const s = out.indexOf(header);
+            if (s < 0) return;
+            const n = out.indexOf('/* =====', s + header.length);
+            out = out.slice(0, s) + (n < 0 ? '' : out.slice(n));
+        };
+        if (!CONFIG.hideThumbnails) drop('/* ===== ПРЕВЬЮ');
+        if (!CONFIG.showAvatars)    drop('/* ===== АВАТАРКИ');
+        if (!CONFIG.dividers)       drop('/* ===== РОВНО ОДИН РАЗДЕЛИТЕЛЬ');
+        if (!CONFIG.cleanPlaylists) drop('/* ===== ПЛЕЙЛИСТЫ');
+        if (!CONFIG.hideAds)        drop('/* ===== РЕКЛАМА');
+        if (!CONFIG.hideShorts)     drop('/* ===== SHORTS');
+        if (!CONFIG.removeSections) drop('/* ===== УБРАННЫЕ РАЗДЕЛЫ');
+        if (!CONFIG.hideMoreTopics) drop('/* ===== РАЗДЕЛ "ЕЩЁ ТЕМЫ"');
+        if (!CONFIG.hideCommunity)  drop('/* ===== СООБЩЕСТВО');
+        return out;
+    };
+
     const injectCSS = () => {
-        if (document.getElementById('reysu-clean-yt')) return;
+        const existing = document.getElementById('reysu-clean-yt');
+        if (existing) return;
         const style = document.createElement('style');
         style.id = 'reysu-clean-yt';
-        style.textContent = css;
+        style.textContent = buildCSS();
         (document.head || document.documentElement).appendChild(style);
     };
     injectCSS();
@@ -810,17 +851,19 @@
     };
 
     const sweep = (root = document) => {
-        killThumbs(root);
-        collapsePlaylistThumbs(root);
-        showAvatars(root);
-        hideAds(root);
-        hideShorts(root);
-        hideCommunity(root);
-        hideMoreTopics(root);
-        hideRemovedSections(root);
-        harvestAvatars(root);
-        injectHistoryAvatars(root);
-        killInlinePlayback(root);
+        if (CONFIG.hideThumbnails) killThumbs(root);
+        if (CONFIG.cleanPlaylists) collapsePlaylistThumbs(root);
+        if (CONFIG.showAvatars) showAvatars(root);
+        if (CONFIG.hideAds) hideAds(root);
+        if (CONFIG.hideShorts) hideShorts(root);
+        if (CONFIG.hideCommunity) hideCommunity(root);
+        if (CONFIG.hideMoreTopics) hideMoreTopics(root);
+        if (CONFIG.removeSections) hideRemovedSections(root);
+        if (CONFIG.historyAvatars) {
+            harvestAvatars(root);
+            injectHistoryAvatars(root);
+        }
+        if (CONFIG.stopAutoplay) killInlinePlayback(root);
     };
 
     const observer = new MutationObserver((mutations) => {
