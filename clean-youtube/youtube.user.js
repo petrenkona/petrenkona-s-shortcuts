@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Clean YouTube Reysu (Text Only)
 // @namespace    reysu
-// @version      3.1
+// @version      3.2
 // @description  Текстовый YouTube: убирает ВСЕ превью, лишние разделы (Музыка/Трансляции/Видеоигры/Новости/Спорт/Обучение/Мода/Студия/Music/Детям/Create) и «Ещё темы». Единый крупный вид карточек (главная == подписки), контент строго по центру, ровно один разделитель под цвет темы.
 // @match        *://m.youtube.com/*
 // @match        *://*.youtube.com/*
@@ -230,7 +230,7 @@
         ytm-compact-playlist-renderer,
         ytm-playlist-renderer {
             display: block !important;
-            min-height: 56px !important;
+            min-height: 0 !important;
             position: relative !important;
             overflow: hidden !important;
         }
@@ -503,11 +503,12 @@
         if (!root.querySelectorAll) return;
         const seen = new Set();
         root.querySelectorAll('a[href*="list="], a[href*="/playlist"]').forEach(a => {
+            // ВАЖНО: только карточка-элемент целиком. Без широких [class*=playlist]
+            // — иначе попадаем в контейнер-обложку (в его классе есть "playlist")
+            // и вешаем на него высоту/рамку → пустые прямоугольники.
             const card = a.closest(
                 'ytm-compact-playlist-renderer, ytm-playlist-renderer, ' +
-                'yt-lockup-view-model, ytm-playlist-video-renderer, ' +
-                'lockup-view-model, [class*="lockup" i], ' +
-                '[class*="playlist" i], [role="listitem"], li'
+                'ytm-playlist-video-renderer, yt-lockup-view-model, lockup-view-model'
             );
             if (!card || seen.has(card)) return;
             seen.add(card);
@@ -517,7 +518,7 @@
             card.style.setProperty('box-sizing', 'border-box', 'important');
             card.style.setProperty('padding', '10px 0', 'important');
             card.style.setProperty('margin', '0', 'important');
-            card.style.setProperty('min-height', '44px', 'important');
+            card.style.setProperty('min-height', '0', 'important');
             card.style.setProperty('border-bottom',
                 '1px solid var(--yt-spec-10-percent-layer, rgba(128,128,128,0.28))',
                 'important');
@@ -526,13 +527,9 @@
             // Поэтому прячем любой блок БЕЗ текста (кроме меню/иконок/кнопок).
             // В плейлистах аватарок нет — так что это безопасно.
             card.querySelectorAll('*').forEach(el => {
-                if (el.matches(
-                    'button, [role="button"], a[aria-label], ytm-menu, ' +
-                    '[class*="menu" i], yt-icon, [class*="icon" i], svg, path'
-                )) return;
-                if (el.querySelector && el.querySelector(
-                    'button, [role="button"], ytm-menu, [class*="menu" i]'
-                )) return;
+                // не трогаем меню ⋮ и всё, что внутри него
+                if (el.closest('ytm-menu, [class*="menu" i], button, [role="button"]'))
+                    return;
                 let t = '';
                 try { t = (el.innerText || '').trim(); } catch (e) {}
                 if (t) return;                       // есть текст — оставляем
