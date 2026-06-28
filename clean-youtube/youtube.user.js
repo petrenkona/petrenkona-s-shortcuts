@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Clean YouTube Reysu (Text Only)
 // @namespace    reysu
-// @version      2.6
+// @version      2.7
 // @description  Текстовый YouTube: убирает ВСЕ превью, лишние разделы (Музыка/Трансляции/Видеоигры/Новости/Спорт/Обучение/Мода/Студия/Music/Детям/Create) и «Ещё темы». Единый крупный вид карточек (главная == подписки), контент строго по центру, ровно один разделитель под цвет темы.
 // @match        *://m.youtube.com/*
 // @match        *://*.youtube.com/*
@@ -207,16 +207,14 @@
             overflow: hidden !important;
         }
 
-        /* ===== ПЛЕЙЛИСТЫ/КОЛЛЕКЦИИ: текст на всю ширину, не уезжает вправо =====
-           После удаления превью метаданные должны занять всю строку слева,
-           а не висеть в правой колонке. */
+        /* ===== ПЛЕЙЛИСТЫ: текст на всю ширину, не уезжает вправо =====
+           Только в карточках плейлистов (главную/ленту НЕ трогаем). После
+           удаления превью метаданные занимают всю строку слева. */
         ytm-compact-playlist-renderer .media-item-metadata,
         ytm-playlist-renderer .media-item-metadata,
         ytm-compact-playlist-renderer [class*="metadata" i],
         ytm-playlist-renderer [class*="metadata" i],
-        ytm-playlist-video-renderer [class*="metadata" i],
-        yt-lockup-view-model .yt-lockup-metadata-view-model-wiz,
-        yt-lockup-view-model [class*="metadata" i] {
+        ytm-playlist-video-renderer [class*="metadata" i] {
             width: 100% !important;
             max-width: 100% !important;
             margin-left: 0 !important;
@@ -412,6 +410,10 @@
     };
 
     // Находит контейнер-обёртку превью, чтобы схлопнуть её целиком (а не только img).
+    // 1) известные контейнеры по селектору; 2) обёртка по классу "thumbnail";
+    // 3) самый верхний предок БЕЗ собственного текста (=чистый блок превью) —
+    //    так убираем остаточное место там, где класс контейнера нестандартный,
+    //    НЕ задевая метаданные (в них есть текст, на них climb останавливается).
     const thumbWrap = (img) => {
         const known = img.closest(
             'ytm-thumbnail-cover, a.media-item-thumbnail-container, ' +
@@ -420,7 +422,6 @@
             'yt-collection-thumbnail-view-model, ytm-thumbnail-overlay'
         );
         if (known) return known;
-        // обёртка по классу, в названии которого есть "thumbnail" (но не аватарка)
         let el = img.parentElement, depth = 0;
         while (el && depth < 5) {
             const cls = (el.className && el.className.toString
@@ -433,7 +434,20 @@
             }
             el = el.parentElement; depth++;
         }
-        return img;
+        // climb по предкам без текста (длительность из цифр/двоеточий игнорируем)
+        let best = img, p = img.parentElement, d = 0;
+        while (p && d < 5) {
+            const txt = (p.textContent || '').replace(/[\d:\s.,]/g, '').trim();
+            if (txt.length > 0) break;          // дошли до текста — дальше не идём
+            // не подниматься выше самой карточки
+            if (p.matches && p.matches(
+                'ytm-rich-item-renderer, ytm-video-with-context-renderer, ' +
+                'ytm-compact-video-renderer, ytm-video-card-renderer, ' +
+                'ytm-media-item, ytm-playlist-video-renderer, ' +
+                'ytm-compact-playlist-renderer, yt-lockup-view-model')) break;
+            best = p; p = p.parentElement; d++;
+        }
+        return best;
     };
 
     const collapse = (el) => {
@@ -466,63 +480,6 @@
                 if (img && isAvatar(img)) return;
                 collapse(thumbWrap(node));
             }
-        });
-    };
-
-    // Схлопывает САМУ ссылку-превью: ведёт на видео/плейлист, содержит
-    // картинку, но НЕ содержит видимого текста (заголовок — отдельная ссылка).
-    // Движко-независимо убирает остаточное место под превью в ЛЮБОЙ карточке.
-    const collapseThumbLinks = (root) => {
-        if (!root.querySelectorAll) return;
-        root.querySelectorAll('a[href]').forEach(a => {
-            const h = a.getAttribute('href') || '';
-            const isMediaLink = h.includes('/watch') || h.includes('/shorts') ||
-                                h.includes('/playlist') || h.includes('list=');
-            if (!isMediaLink) return;
-            // есть медиа внутри?
-            const hasMedia = a.querySelector(
-                'img, yt-image, ytm-thumbnail-cover, ' +
-                '[class*="thumbnail" i], [class*="image" i]'
-            );
-            if (!hasMedia) return;
-            // видимый текст (innerText не учитывает скрытые элементы, напр. длительность)
-            let txt = '';
-            try { txt = (a.innerText || '').trim(); }
-            catch (e) { txt = (a.textContent || '').trim(); }
-            // есть реальный текст → это заголовок/ссылка-канал, не трогаем
-            if (txt && !/^[\d:\s.,чмсhms]+$/i.test(txt)) return;
-            a.style.setProperty('display', 'none', 'important');
-            a.style.setProperty('height', '0', 'important');
-            a.style.setProperty('width', '0', 'important');
-            a.style.setProperty('margin', '0', 'important');
-            a.style.setProperty('padding', '0', 'important');
-        });
-        // Доп. страховка (любой движок): крупный блок внутри карточки, в котором
-        // есть картинка, но нет видимого текста и нет аватарки — это остаток
-        // превью. Схлопываем, чтобы карточка была по высоте = только текст.
-        root.querySelectorAll(
-            'ytm-video-with-context-renderer, ytm-compact-video-renderer, ' +
-            'ytm-rich-item-renderer, yt-lockup-view-model, ytm-media-item, ' +
-            'ytm-video-card-renderer'
-        ).forEach(card => {
-            card.querySelectorAll(':scope > *, :scope > * > *').forEach(el => {
-                if (el.dataset.reysuChecked) return;
-                let txt = '';
-                try { txt = (el.innerText || '').trim(); } catch (e) {}
-                if (txt) { el.dataset.reysuChecked = '1'; return; } // есть текст
-                const img = el.querySelector('img, yt-image');
-                if (!img) { el.dataset.reysuChecked = '1'; return; } // нет картинки
-                let hasAvatar = false;
-                for (const im of el.querySelectorAll('img'))
-                    if (isAvatar(im)) { hasAvatar = true; break; }
-                if (hasAvatar) { el.dataset.reysuChecked = '1'; return; } // аватарка
-                // ждём раскладку: пока высота 0 — не помечаем, проверим позже
-                if (el.offsetHeight > 70) {
-                    el.style.setProperty('display', 'none', 'important');
-                    el.style.setProperty('height', '0', 'important');
-                    el.dataset.reysuChecked = '1';
-                }
-            });
         });
     };
 
@@ -705,8 +662,11 @@
             '.media-item-byline, [class*="byline" i], [class*="metadata" i]'
         );
         let t = (by?.textContent || '').trim();
-        t = t.split('•')[0].split('·')[0].trim();
-        return t.toLowerCase();
+        t = t.split('•')[0].split('·')[0];
+        // отрезаем "N тыс./млн просмотров…" — имя канала идёт первым (имена с
+        // цифрами, напр. LuCAS8, при этом сохраняются)
+        t = t.replace(/\s*\d[\d.,\s]*(тыс\.?|млн|млрд|просмотр\w*|views?|view).*$/i, '');
+        return t.trim().toLowerCase();
     };
 
     const harvestAvatars = (root) => {
@@ -782,7 +742,6 @@
 
     const sweep = (root = document) => {
         killThumbs(root);
-        collapseThumbLinks(root);
         showAvatars(root);
         hideAds(root);
         hideShorts(root);
