@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Clean YouTube Reysu (Text Only)
 // @namespace    reysu
-// @version      3.0
+// @version      3.1
 // @description  Текстовый YouTube: убирает ВСЕ превью, лишние разделы (Музыка/Трансляции/Видеоигры/Новости/Спорт/Обучение/Мода/Студия/Music/Детям/Create) и «Ещё темы». Единый крупный вид карточек (главная == подписки), контент строго по центру, ровно один разделитель под цвет темы.
 // @match        *://m.youtube.com/*
 // @match        *://*.youtube.com/*
@@ -521,24 +521,31 @@
             card.style.setProperty('border-bottom',
                 '1px solid var(--yt-spec-10-percent-layer, rgba(128,128,128,0.28))',
                 'important');
-            // обложка плейлиста и любые картинки внутри — убрать целиком
-            card.querySelectorAll(
-                'img, yt-image, ytm-thumbnail-cover, picture, ' +
-                'a.compact-media-item-image, .compact-media-item-image, ' +
-                '[class*="thumbnail" i], [class*="image" i], ' +
-                '.ytLockupViewModelHostThumbnailContainer, ' +
-                '.yt-lockup-view-model-wiz__content-image'
-            ).forEach(el => {
+            // Убираем ВСЁ, кроме текста и меню: обложки плейлистов бывают не
+            // картинкой, а цветным блоком (те самые «синяя/красная полоса»).
+            // Поэтому прячем любой блок БЕЗ текста (кроме меню/иконок/кнопок).
+            // В плейлистах аватарок нет — так что это безопасно.
+            card.querySelectorAll('*').forEach(el => {
+                if (el.matches(
+                    'button, [role="button"], a[aria-label], ytm-menu, ' +
+                    '[class*="menu" i], yt-icon, [class*="icon" i], svg, path'
+                )) return;
+                if (el.querySelector && el.querySelector(
+                    'button, [role="button"], ytm-menu, [class*="menu" i]'
+                )) return;
+                let t = '';
+                try { t = (el.innerText || '').trim(); } catch (e) {}
+                if (t) return;                       // есть текст — оставляем
                 el.style.setProperty('display', 'none', 'important');
-                el.style.setProperty('width', '0', 'important');
                 el.style.setProperty('height', '0', 'important');
-                el.style.setProperty('margin', '0', 'important');
+                el.style.setProperty('min-height', '0', 'important');
             });
-            // метаданные на всю ширину слева
+            // текст/метаданные на всю ширину слева
             card.querySelectorAll(
                 '[class*="metadata" i], .media-item-metadata, ' +
                 '.compact-media-item-metadata'
             ).forEach(m => {
+                m.style.setProperty('display', 'block', 'important');
                 m.style.setProperty('width', '100%', 'important');
                 m.style.setProperty('max-width', '100%', 'important');
                 m.style.setProperty('margin-left', '0', 'important');
