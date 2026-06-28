@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Clean YouTube Reysu (Text Only)
 // @namespace    reysu
-// @version      2.8
+// @version      2.9
 // @description  Текстовый YouTube: убирает ВСЕ превью, лишние разделы (Музыка/Трансляции/Видеоигры/Новости/Спорт/Обучение/Мода/Студия/Music/Детям/Create) и «Ещё темы». Единый крупный вид карточек (главная == подписки), контент строго по центру, ровно один разделитель под цвет темы.
 // @match        *://m.youtube.com/*
 // @match        *://*.youtube.com/*
@@ -185,8 +185,10 @@
         [class*="headline" i] {
             max-height: none !important;
             height: auto !important;
-            overflow: visible !important;
+            display: -webkit-box !important;
+            -webkit-box-orient: vertical !important;
             -webkit-line-clamp: 2 !important;
+            overflow: hidden !important;   /* 3+ строки обрезаются, не наезжают */
         }
         ytm-video-with-context-renderer .media-item-headline .yt-core-attributed-string,
         ytm-compact-video-renderer .media-item-headline .yt-core-attributed-string,
@@ -492,24 +494,44 @@
         });
     };
 
-    // ТОЛЬКО плейлисты: схлопываем ссылку-превью (ведёт на плейлист, картинка,
-    // без текста). Главную/ленту (/watch) НЕ трогаем — поэтому текст там не
-    // съезжает. Здесь же убираем пустую левую колонку у карточек плейлистов.
+    // ТОЛЬКО плейлисты (карточки, ведущие на плейлист). Главную/ленту (/watch)
+    // НЕ трогаем — поэтому текст там не съезжает. Внутри карточки плейлиста
+    // прячем ВСЮ обложку (в плейлистах аватарок нет) и растягиваем метаданные
+    // на всю ширину слева — пустая левая колонка пропадает.
     const collapsePlaylistThumbs = (root) => {
         if (!root.querySelectorAll) return;
+        const seen = new Set();
         root.querySelectorAll('a[href*="list="], a[href*="/playlist"]').forEach(a => {
-            const hasMedia = a.querySelector(
-                'img, yt-image, ytm-thumbnail-cover, ' +
-                '[class*="thumbnail" i], [class*="image" i]'
+            const card = a.closest(
+                'ytm-compact-playlist-renderer, ytm-playlist-renderer, ' +
+                'yt-lockup-view-model, ytm-playlist-video-renderer'
             );
-            if (!hasMedia) return;
-            let txt = '';
-            try { txt = (a.innerText || '').trim(); }
-            catch (e) { txt = (a.textContent || '').trim(); }
-            if (txt && !/^[\d:\s.,]+$/.test(txt)) return; // есть текст — это заголовок
-            a.style.setProperty('display', 'none', 'important');
-            a.style.setProperty('width', '0', 'important');
-            a.style.setProperty('height', '0', 'important');
+            if (!card || seen.has(card)) return;
+            seen.add(card);
+            // обложка плейлиста и любые картинки внутри — убрать целиком
+            card.querySelectorAll(
+                'img, yt-image, ytm-thumbnail-cover, picture, ' +
+                'a.compact-media-item-image, .compact-media-item-image, ' +
+                '[class*="thumbnail" i], [class*="image" i], ' +
+                '.ytLockupViewModelHostThumbnailContainer, ' +
+                '.yt-lockup-view-model-wiz__content-image'
+            ).forEach(el => {
+                el.style.setProperty('display', 'none', 'important');
+                el.style.setProperty('width', '0', 'important');
+                el.style.setProperty('height', '0', 'important');
+                el.style.setProperty('margin', '0', 'important');
+            });
+            // метаданные на всю ширину слева
+            card.querySelectorAll(
+                '[class*="metadata" i], .media-item-metadata, ' +
+                '.compact-media-item-metadata'
+            ).forEach(m => {
+                m.style.setProperty('width', '100%', 'important');
+                m.style.setProperty('max-width', '100%', 'important');
+                m.style.setProperty('margin-left', '0', 'important');
+                m.style.setProperty('padding-left', '0', 'important');
+                m.style.setProperty('text-align', 'left', 'important');
+            });
         });
     };
 
