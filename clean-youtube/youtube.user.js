@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Clean YouTube Reysu (Text Only)
 // @namespace    reysu
-// @version      2.9
+// @version      3.0
 // @description  Текстовый YouTube: убирает ВСЕ превью, лишние разделы (Музыка/Трансляции/Видеоигры/Новости/Спорт/Обучение/Мода/Студия/Music/Детям/Create) и «Ещё темы». Единый крупный вид карточек (главная == подписки), контент строго по центру, ровно один разделитель под цвет темы.
 // @match        *://m.youtube.com/*
 // @match        *://*.youtube.com/*
@@ -181,8 +181,9 @@
         ytm-video-with-context-renderer .media-item-headline,
         ytm-compact-video-renderer .media-item-headline,
         ytm-video-card-renderer .media-item-headline,
+        ytm-channel-video-card-renderer .media-item-headline,
         ytm-media-item .media-item-headline,
-        [class*="headline" i] {
+        ytm-playlist-video-renderer .media-item-headline {
             max-height: none !important;
             height: auto !important;
             display: -webkit-box !important;
@@ -504,10 +505,22 @@
         root.querySelectorAll('a[href*="list="], a[href*="/playlist"]').forEach(a => {
             const card = a.closest(
                 'ytm-compact-playlist-renderer, ytm-playlist-renderer, ' +
-                'yt-lockup-view-model, ytm-playlist-video-renderer'
+                'yt-lockup-view-model, ytm-playlist-video-renderer, ' +
+                'lockup-view-model, [class*="lockup" i], ' +
+                '[class*="playlist" i], [role="listitem"], li'
             );
             if (!card || seen.has(card)) return;
             seen.add(card);
+            // гарантированная высота + разделитель, чтобы плейлисты
+            // («Смотреть позже» / «Понравившиеся») не наезжали друг на друга
+            card.style.setProperty('display', 'block', 'important');
+            card.style.setProperty('box-sizing', 'border-box', 'important');
+            card.style.setProperty('padding', '10px 0', 'important');
+            card.style.setProperty('margin', '0', 'important');
+            card.style.setProperty('min-height', '44px', 'important');
+            card.style.setProperty('border-bottom',
+                '1px solid var(--yt-spec-10-percent-layer, rgba(128,128,128,0.28))',
+                'important');
             // обложка плейлиста и любые картинки внутри — убрать целиком
             card.querySelectorAll(
                 'img, yt-image, ytm-thumbnail-cover, picture, ' +
